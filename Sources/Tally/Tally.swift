@@ -1,4 +1,8 @@
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 /// Local accounting and admission over caller-attributed peer-global evidence.
 public struct Tally: Sendable {
