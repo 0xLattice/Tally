@@ -1,4 +1,8 @@
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 struct BoundedMap<Key: Hashable & Sendable, Value: Sendable>: Sendable {
     private var storage: [Key: Value] = [:]

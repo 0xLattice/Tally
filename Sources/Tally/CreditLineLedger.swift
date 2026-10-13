@@ -1,4 +1,8 @@
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 public actor CreditLineLedger {
     private var lines: [PeerID: CreditLine] = [:]

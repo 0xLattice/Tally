@@ -1,4 +1,8 @@
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 /// Per-peer token buckets and global send-rate pressure.
 struct AdmissionController: Sendable {

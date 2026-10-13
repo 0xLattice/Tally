@@ -1,6 +1,12 @@
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 #if canImport(os)
 import os
+#else
+import Synchronization
 #endif
 
 #if canImport(os)
@@ -17,19 +23,18 @@ struct LockedState<State: Sendable>: Sendable {
     }
 }
 #else
-final class LockedState<State: Sendable>: @unchecked Sendable {
-    private var _state: State
-    private let _lock = NSLock()
+/// `Mutex` is in the standard library everywhere this branch builds, so it
+/// needs no more of Foundation than the rest of Tally does.
+final class LockedState<State: Sendable>: Sendable {
+    private let mutex: Mutex<State>
 
     init(initialState: State) {
-        _state = initialState
+        mutex = Mutex(initialState)
     }
 
     @inline(__always)
-    func withLock<T>(_ body: (inout State) throws -> T) rethrows -> T {
-        _lock.lock()
-        defer { _lock.unlock() }
-        return try body(&_state)
+    func withLock<T: Sendable>(_ body: @Sendable (inout State) throws -> T) rethrows -> T {
+        try mutex.withLock { state in try body(&state) }
     }
 }
 #endif
