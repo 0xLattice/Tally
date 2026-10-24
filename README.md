@@ -110,6 +110,8 @@ or canonicity.
 
 ## Documentation
 
+Published at [lattice.build/docs](https://lattice.build/docs/protocol/tally/) from the files below.
+
 - [Architecture](docs/architecture.md)
 - [Correctness invariants](docs/correctness-invariants.md)
 
