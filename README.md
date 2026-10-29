@@ -118,7 +118,7 @@ Published at [lattice.build/docs](https://lattice.build/docs/protocol/tally/) fr
 ## Installation
 
 ```swift
-.package(url: "https://github.com/0xLattice/Tally.git", from: "3.0.0")
+.package(url: "https://github.com/0xLattice/Tally.git", from: "4.0.0")
 ```
 
 Tally requires Swift 6 and uses `swift-crypto` for SHA-256.
