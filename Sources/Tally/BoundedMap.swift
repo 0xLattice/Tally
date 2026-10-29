@@ -19,6 +19,10 @@ struct BoundedMap<Key: Hashable & Sendable, Value: Sendable>: Sendable {
         storage.count
     }
 
+    var entries: [Key: Value] {
+        storage
+    }
+
     func value(forKey key: Key) -> Value? {
         storage[key]
     }
