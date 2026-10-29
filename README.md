@@ -60,6 +60,15 @@ is available without receiving free trust under pressure.
 The exact score and threshold are specified in
 [Architecture](docs/architecture.md).
 
+## Standing
+
+Standing is a non-negative byte balance per peer that orders whom a busy host
+serves first; `servingPriority(for:)` returns it. `recordUsefulReceived` and
+`creditStanding` raise it, `debitStanding` lowers it and stops at zero. It does
+not decay and has no cap; only positive standings are kept, and `standings()`
+exports them for the caller to persist and restore with `creditStanding`.
+Admission evidence does not affect it.
+
 ## Interactive work
 
 ```swift
@@ -118,7 +127,7 @@ Published at [lattice.build/docs](https://lattice.build/docs/protocol/tally/) fr
 ## Installation
 
 ```swift
-.package(url: "https://github.com/0xLattice/Tally.git", from: "3.0.0")
+.package(url: "https://github.com/0xLattice/Tally.git", from: "4.0.0")
 ```
 
 Tally requires Swift 6 and uses `swift-crypto` for SHA-256.

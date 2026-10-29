@@ -68,15 +68,6 @@ struct PeerEvidence: Sendable {
         return min(max(score, 0), 1)
     }
 
-    /// Protocol violations decayed to `now`, without changing the record.
-    func decayedProtocolViolations(at now: ContinuousClock.Instant, halfLife: Double) -> Double {
-        let elapsed = lastUpdate.duration(to: now)
-        let seconds = Double(elapsed.components.seconds)
-            + Double(elapsed.components.attoseconds) / 1e18
-        guard seconds > 0 else { return protocolViolations }
-        return protocolViolations * exp2(-seconds / halfLife)
-    }
-
     private mutating func decay(to now: ContinuousClock.Instant, halfLife: Double) {
         let elapsed = lastUpdate.duration(to: now)
         let seconds = Double(elapsed.components.seconds)
