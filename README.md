@@ -1,15 +1,16 @@
 # Tally
 
-Local, in-memory peer evidence and admission control for Swift.
+Tally is a Swift library that keeps local, in-memory accounts of the peers a
+process talks to and answers two questions about them: should this process
+spend resources on this peer now, and whom should it serve first when it is
+busy. In Lattice, the networking layer ([Ivy](https://lattice.build/docs/protocol/ivy/))
+asks Tally before it serves a peer, and the node credits and persists each
+peer's standing.
 
-Tally answers one narrow question: should this process spend resources on this
-peer now? The caller authenticates the peer and supplies attributable evidence;
-Tally decays that evidence and combines it with request rate and local send
-pressure.
+A score or a standing is local policy. It is not shared reputation and grants
+no authority.
 
-A score is local policy, not shared reputation or application authority.
-
-## Basic use
+## Quick example
 
 ```swift
 import Tally
@@ -27,6 +28,30 @@ let response = makeResponse()
 tally.recordSent(peer: peer, bytes: response.count)
 ```
 
+The caller authenticates the peer first. Tally never does.
+
+## Key concepts
+
+| Concept | What it is | API |
+| --- | --- | --- |
+| Evidence | Decaying per-peer history: bytes exchanged, proven violations, challenge work. | `recordSent`, `recordReceived`, `recordProtocolViolation` |
+| Admission | One allow-or-deny decision from the peer's request rate, its evidence and the process's send pressure. | `shouldAllow(peer:)` |
+| Standing | A byte balance per peer that orders whom a busy host serves first. | `servingPriority(for:)`, `creditStanding`, `debitStanding` |
+| Challenge | Proof of work a new peer can do to earn evidence. | `issueChallenge`, `verifyChallenge` |
+| Identity work | Work measured from the peer's key. | `KeyDifficulty.keyWorkBits(_:)` |
+| Credit line | Optional two-party balance accounting, separate from all of the above. | `CreditLineLedger` |
+
+[Tally architecture](docs/architecture.md) gives the score formula, the
+admission threshold and the lifetime of each kind of state.
+
+### Evidence and admission
+
+`shouldAllow(peer:)` first consumes a per-peer request token. When
+process-wide send pressure is low, that is enough. Under load, the peer must
+also meet an evidence threshold that rises with pressure. An unknown peer can
+therefore start while capacity is available, and gets no free trust under
+pressure.
+
 Record a violation only when the surrounding protocol can prove that the
 authenticated peer broke it:
 
@@ -36,40 +61,27 @@ if signatureIsValid && signedRecordBreaksProtocol {
 }
 ```
 
-Timeouts, unavailable content, failed dials, latency, route quality, and local
-overload stay with the service that can interpret them. They are not protocol
-violations.
+Timeouts, unavailable content, failed dials, latency, route quality and local
+overload are not protocol violations. They stay with the service that can
+interpret them.
 
-## Evidence and admission
+### Standing
 
-Admission uses four evidence classes. Exchange, violations, and challenge work
-decay; identity work is derived from the peer key.
+Standing is a non-negative byte balance per peer. `servingPriority(for:)`
+returns it.
 
-| Signal | Meaning |
+| Call | Effect |
 | --- | --- |
-| Sent and received bytes | Authenticated exchange history |
-| Protocol violations | Cryptographically attributable misbehavior |
-| Challenge work | Verified, peer-bound interactive work |
-| Identity work | Canonical work derived from the peer key |
+| `recordUsefulReceived(peer:bytes:)` | Raises standing by content this process requested from the peer and verified. |
+| `creditStanding(peer:bytes:)` | Raises standing. |
+| `debitStanding(peer:bytes:)` | Lowers standing, stopping at zero. |
+| `standings()` | Returns every positive standing, for the caller to persist. |
 
-`shouldAllow(peer:)` first consumes a per-peer request token. When process-wide
-send pressure is low, that is enough. Under load, the peer must also meet a
-rising evidence threshold. Unknown peers can therefore bootstrap while capacity
-is available without receiving free trust under pressure.
+Standing does not decay and has no cap. Only positive standings are kept. To
+restore after a restart, call `creditStanding` with each exported value.
+Admission evidence does not affect standing.
 
-The exact score and threshold are specified in
-[Architecture](docs/architecture.md).
-
-## Standing
-
-Standing is a non-negative byte balance per peer that orders whom a busy host
-serves first; `servingPriority(for:)` returns it. `recordUsefulReceived` and
-`creditStanding` raise it, `debitStanding` lowers it and stops at zero. It does
-not decay and has no cap; only positive standings are kept, and `standings()`
-exports them for the caller to persist and restore with `creditStanding`.
-Admission evidence does not affect it.
-
-## Interactive work
+### Challenges
 
 ```swift
 let challenge = tally.issueChallenge(for: peer)
@@ -84,16 +96,16 @@ if let solution = ChallengeSolver().solve(challenge) {
 }
 ```
 
-Challenges are peer-bound, expiring, and single-use. Invalid, expired, or
+Challenges are peer-bound, expiring and single-use. Invalid, expired or
 replayed solutions earn nothing.
 
-`KeyDifficulty.keyWorkBits(_:)` is the canonical identity-work measure used by
-admission and identity-PoW gates. It measures work; it does not validate keys or
-grant authority.
+### Identity work
 
-## Credit lines
+`KeyDifficulty.keyWorkBits(_:)` is the canonical identity-work measure used
+by admission and identity proof-of-work gates. It measures work. It does not
+validate keys or grant authority.
 
-`CreditLineLedger` provides optional bilateral accounting:
+### Credit lines
 
 ```swift
 let ledger = CreditLineLedger(localID: localPeer)
@@ -101,30 +113,34 @@ await ledger.establish(with: peer)
 await ledger.earnFromRelay(peer: peer, amount: 4_096)
 ```
 
-Credit is independent from admission evidence. The host defines service value,
-validates settlement, and decides how balances affect service.
+Credit is independent of admission evidence and of standing. The host defines
+service value, validates settlement, and decides how balances affect service.
 
 ## Boundary
 
-| Tally owns | Its caller owns |
+| Tally owns | The caller owns |
 | --- | --- |
 | Decayed peer evidence and admission score | Peer authentication and evidence attribution |
 | Per-peer request buckets and send pressure | The work guarded by one admission check |
-| Challenge issue, verification, and replay prevention | Where proof of work is required |
+| Standing arithmetic and export | When to credit or debit standing, and persisting it |
+| Challenge issue, verification and replay prevention | Where proof of work is required |
 | Canonical identity-work measurement | Identity validity and application authority |
-| Bilateral balance arithmetic | Pricing, settlement proof, and enforcement |
+| Bilateral balance arithmetic | Pricing, settlement proof and enforcement |
 
-Tally does not decide content validity, routing, storage, topology, consensus,
+Tally does not decide content validity, routing, storage, topology, consensus
 or canonicity.
 
 ## Documentation
 
-Published at [lattice.build/docs](https://lattice.build/docs/protocol/tally/) from the files below.
+Published at [lattice.build/docs](https://lattice.build/docs/protocol/tally/)
+from the files below.
 
-- [Architecture](docs/architecture.md)
-- [Correctness invariants](docs/correctness-invariants.md)
+| Page | What it covers |
+| --- | --- |
+| [Tally architecture](docs/architecture.md) | How evidence decays, the score formula, the admission threshold, standing, and how long each kind of state lives. |
+| [Tally invariants](docs/correctness-invariants.md) | The rules a change to Tally must keep, each with its ID and the code and tests that enforce it. |
 
-## Installation
+## Install
 
 ```swift
 .package(url: "https://github.com/0xLattice/Tally.git", from: "4.0.0")
